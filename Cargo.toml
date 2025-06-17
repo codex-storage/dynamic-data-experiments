@@ -1,0 +1,9 @@
+[package]
+name = "dynamic-data-experiments"
+description = "Experiments to support dynamic data for Codex"
+authors = ["Mohammed Alghazwi <m.ghazwi@gmail.com>"]
+readme = "README.md"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
