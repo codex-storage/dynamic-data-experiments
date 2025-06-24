@@ -18,3 +18,5 @@ ark-bn254 = "0.5.0"
 ark-poly = "0.5.0"
 ark-poly-commit = "0.5.0"
 anyhow = "1.0.95"
+reed-solomon-erasure = { version = "6.0.0", features = [ "simd-accel" ] }
+ark-crypto-primitives = "0.5.0"
