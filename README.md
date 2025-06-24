@@ -14,8 +14,8 @@ This is a prototype implementation of the proposed Codex storage proofs for dyna
 **Note:** in the above I switched the directions of the encoding and commitment (opposite of the [proposal](https://hackmd.io/kPGC3VIZSaWj8DBYOjd4vA?view)) just because it was easier to implement but basically it is same thing.
 
 ### Sampling
-- [ ] Select a set of columns randomly
-- [ ] Generate a KZG evaluation proof at random point for each column
+- [x] Select a set of columns randomly
+- [x] Generate a KZG evaluation proof at random point for each column
 - [ ] Aggregate the KZG evaluation proofs
 
 ### Updating the Data
@@ -31,7 +31,7 @@ This is a prototype implementation of the proposed Codex storage proofs for dyna
 - [ ] Compute the `delta_comm` = `fat_comm'` - `fat_comm`
 - [ ] Compute the new row commitment `row_comm'` = `row_comm` + `delta`
 
-### Prove Data Update
+### Prove Data & Commitment Update
 - [ ] TODO...
 
 ### TODO:
