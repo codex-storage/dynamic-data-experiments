@@ -11,8 +11,8 @@ pub struct Params{
     pub n: usize,
     pub m: usize,
 }
-/// data struct contains shards matrix where each "shard" is row
-/// the matrix contains n rows, k of which are source data and the rest (n-k) are parity
+/// data struct contains shards matrix with dimensions `n`*`m`
+/// the matrix contains n rows, k of which are source data and the rest p = (n-k) are parity
 #[derive(Clone, Debug)]
 pub struct Data<T>{
     pub params: Params,
@@ -29,10 +29,10 @@ impl DataMatrix<u8> for Data<u8> {
         let matrix: Vec<Vec<u8>> = (0..params.n)
             .map(|i| {
                 if i < params.k {
-                    // data shard: random u8
+                    // data: random u8
                     (0..params.m).map(|_| rng.random::<u8>()).collect()
                 } else {
-                    // parity shard: zero
+                    // parity: zero
                     vec![0u8; params.m]
                 }
             })
@@ -49,18 +49,18 @@ impl DataMatrix<u8> for Data<u8> {
         // sanity checks
         assert!(
             new_col.len() == self.params.k,
-            "new_row length ({}) must equal k ({})",
+            "new_col length ({}) must equal k ({})",
             new_col.len(),
             self.params.k
         );
         assert!(
             c < self.params.m,
-            "row index {} out of bounds; must be < {}",
+            "col index {} out of bounds; must be < {}",
             c,
             self.params.m
         );
 
-        // write into each of the k data shards at position c
+        // write into each of the k data row at position c
         for i in 0..self.params.k {
             self.matrix[i][c] = new_col[i];
         }
