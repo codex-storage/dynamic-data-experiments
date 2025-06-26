@@ -5,7 +5,7 @@ mod tests {
     use crate::kzg::{F, KZGPolyComm};
     use crate::field_matrix::Matrix;
     use ark_poly_commit::{Polynomial};
-    use crate::encoder::{BLSEncoder, RSEncoder};
+    use crate::encoder::{BLSEncoder, BLSFieldEncoder, G8Encoder};
     use crate::traits::{DataMatrix, Encoder, PolynomialCommitmentScheme};
 
     #[test]
@@ -31,7 +31,7 @@ mod tests {
         let original: Vec<Vec<u8>> = data.matrix[..k].to_vec();
 
         // encode
-        RSEncoder::encode(&mut data).expect("encode failed");
+        G8Encoder::encode(&mut data).expect("encode failed");
         println!("data after encoding:");
         data.pretty_print();
 
@@ -44,7 +44,7 @@ mod tests {
         matrix_opts[k] = None;
 
         // reconstruct missing rows
-        RSEncoder::reconstruct(data.params.clone(), &mut matrix_opts).expect("reconstruction should succeed");
+        G8Encoder::reconstruct(data.params.clone(), &mut matrix_opts).expect("reconstruction should succeed");
 
         // verify reconstruction for data shards
         for i in 0..k {
@@ -54,7 +54,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bls_encodeer() {
+    fn test_bls_encoder() {
         // test parameters
         let k = 4;
         let p = 4;
@@ -99,6 +99,54 @@ mod tests {
     }
 
     #[test]
+    fn test_bls_field_encoder() {
+        // test parameters
+        let k = 4;
+        let p = 4;
+        let n = k + p;
+        let m = 8;
+
+        // generate Data with random content
+        let params = Params {
+            k,
+            n,
+            m,
+        };
+        let data = Data::new_random(params);
+        println!("data #row ={}", data.matrix.len());
+        println!("data #col ={}", data.matrix[0].len());
+        println!("data before encoding:");
+        data.pretty_print();
+        // original data matrix
+        let mut original = Matrix::from_data(&data);
+        let original_copy = Matrix::from_data(&data);
+        println!("data as Field elements:");
+        original.pretty_print();
+
+        // encode
+        BLSFieldEncoder::encode(&mut original).expect("encode failed");
+        println!("data after encoding:");
+        original.pretty_print();
+
+        // verify data matrix unchanged
+        assert_eq!(original.elms[..k], original_copy.elms[..k]);
+
+        // simulate loss of one data and one parity rows
+        let mut matrix_opts: Vec<_> = data.matrix.iter().cloned().map(Some).collect();
+        matrix_opts[1] = None;
+        matrix_opts[k] = None;
+
+        // TODO: reconstruct missing rows
+        // BLSEncoder::reconstruct(data.params.clone(), &mut matrix_opts).expect("reconstruction should succeed");
+
+        // verify reconstruction for data shards
+        // for i in 0..k {
+        //     let recovered = matrix_opts[i].clone().unwrap();
+        //     assert_eq!(recovered, &original[i][..]);
+        // }
+    }
+
+    #[test]
     fn test_commit_rows() {
         // dimensions: 8 rows (4 parity), 8 columns
         let n = 8;
@@ -112,7 +160,7 @@ mod tests {
             m,
         };
         let mut data = Data::new_random(params.clone());
-        RSEncoder::encode(&mut data).expect("encode failed");
+        G8Encoder::encode(&mut data).expect("encode failed");
 
         // make a random n×m matrix
         let matrix = Matrix::from_data(&data);
@@ -136,7 +184,7 @@ mod tests {
 
         // check that each polynomial really interpolates its original rows
         for (i, poly) in row_polys.iter().enumerate() {
-            let row = matrix.row(i);
+            let row = matrix.get_row(i).unwrap();
             // evaluate poly at each domain point and collect
             let evals: Vec<_> = srs
                 .ploycommit_domain
@@ -161,7 +209,7 @@ mod tests {
             m,
         };
         let mut data = Data::new_random(params.clone());
-        RSEncoder::encode(&mut data).expect("encode failed");
+        G8Encoder::encode(&mut data).expect("encode failed");
 
         // make a random n×m matrix
         let matrix = Matrix::from_data(&data);
@@ -178,7 +226,7 @@ mod tests {
             for col in 0..m {
                 let proof = KZGPolyComm::open(&kzg_comm, &srs, row, col)
                     .expect("open should succeed");
-                let expected: F = matrix.row(row)[col].clone();
+                let expected: F = matrix.elms[row][col].clone();
 
                 assert!(
                     KZGPolyComm::verify(&kzg_comm, &srs, row, col, expected, &proof)
@@ -206,7 +254,7 @@ mod tests {
         };
         // snapshot of original
         let mut data = Data::new_random(params);
-        RSEncoder::encode(&mut data).expect("encode failed");
+        G8Encoder::encode(&mut data).expect("encode failed");
         println!("original data:");
         data.pretty_print();
 
@@ -230,7 +278,7 @@ mod tests {
             );
         }
 
-        let _coded_row = RSEncoder::encode_col(&mut data, c).unwrap();
+        let _coded_row = G8Encoder::encode_col(&mut data, c).unwrap();
         println!("data after encoding update:");
         data.pretty_print();
     }
@@ -250,7 +298,7 @@ mod tests {
         };
         // snapshot of original
         let mut data = Data::new_random(params.clone());
-        RSEncoder::encode(&mut data).expect("encode failed");
+        G8Encoder::encode(&mut data).expect("encode failed");
 
         // Build a matrix where entry (i,j) = i * m + j
         let mut matrix = Matrix::<F>::from_data(&data);
@@ -266,7 +314,7 @@ mod tests {
 
         // a row to update
         let row_idx = 1;
-        let old_row = matrix.row(row_idx);
+        let old_row = matrix.get_row(row_idx)?;
 
         // a new row by adding a constant to each element
         let new_row: Vec<_> = old_row.iter()
@@ -275,7 +323,7 @@ mod tests {
 
         // Apply the change to the in-memory matrix
         {
-            let row_slice = matrix.row_mut(row_idx);
+            let row_slice = matrix.get_row_mut(row_idx)?;
             for (j, val) in new_row.iter().enumerate() {
                 row_slice[j] = *val;
             }
@@ -291,7 +339,7 @@ mod tests {
                 .elements()
                 .map(|x| poly.polynomial().evaluate(&x))
                 .collect();
-            assert_eq!(evals, matrix.row(i));
+            assert_eq!(evals, matrix.get_row(i)?);
         }
 
         // === new fresh commit on updated matrix ===

@@ -18,7 +18,7 @@ use ark_poly_commit::marlin_pc::MarlinKZG10;
 use ark_poly_commit::sonic_pc::UniversalParams;
 use crate::byte_data::Params;
 use crate::field_matrix::Matrix;
-use crate::traits::PolynomialCommitmentScheme;
+use crate::traits::{PolynomialCommitmentScheme, DataMatrix};
 use ark_crypto_primitives::sponge::poseidon::{PoseidonSponge, PoseidonConfig};
 use ark_poly_commit::kzg10::Proof;
 
@@ -67,7 +67,8 @@ impl PolynomialCommitmentScheme for KZGPolyComm {
         let mut row_polynomials = vec![];
         let timer = start_timer!(|| format!("Poly evaluations and interpolation for {} rows", degree));
         for i in 0..matrix.params.n{
-            let poly_evals = Evaluations::from_vec_and_domain(matrix.row(i), srs.ploycommit_domain.clone());
+            let row = matrix.get_row(i)?.to_vec();
+            let poly_evals = Evaluations::from_vec_and_domain(row, srs.ploycommit_domain.clone());
             let row_poly = poly_evals.interpolate();
             let label = String::from(format!("row_poly_{}", i));
             let labeled_poly = LabeledPolynomial::new(

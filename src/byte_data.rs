@@ -11,6 +11,44 @@ pub struct Params{
     pub n: usize,
     pub m: usize,
 }
+
+impl Params{
+    pub fn check_bounds(&self, r: usize, c: usize) -> anyhow::Result<()>{
+        assert!(
+            r < self.n,
+            "row index {} out of bounds; must be < {}",
+            r,
+            self.n
+        );
+        assert!(
+            c < self.m,
+            "col index {} out of bounds; must be < {}",
+            c,
+            self.m
+        );
+        Ok(())
+    }
+    pub fn check_rows(&self, r: usize) -> anyhow::Result<()>{
+        assert!(
+            r < self.n,
+            "row index {} out of bounds; must be < {}",
+            r,
+            self.n
+        );
+        Ok(())
+    }
+
+    pub fn check_cols(&self, c: usize) -> anyhow::Result<()>{
+        assert!(
+            c < self.m,
+            "col index {} out of bounds; must be < {}",
+            c,
+            self.m
+        );
+        Ok(())
+    }
+}
+
 /// data struct contains shards matrix with dimensions `n`*`m`
 /// the matrix contains n rows, k of which are source data and the rest p = (n-k) are parity
 #[derive(Clone, Debug)]
@@ -20,19 +58,9 @@ pub struct Data<T>{
 }
 
 impl<T> Data<T>{
-    pub fn get_row(&self, idx: usize) -> &Vec<T>{
-        &self.matrix[idx]
-    }
 
     pub fn get_row_mut(&mut self, idx: usize) -> &mut Vec<T>{
         &mut self.matrix[idx]
-    }
-
-    pub fn get_col(&self, idx: usize) -> Vec<&T> {
-        self.matrix
-            .iter()
-            .map(|row| &row[idx])
-            .collect()
     }
 
     pub fn get_col_mut(&mut self, idx: usize) -> Vec<&mut T> {
@@ -67,9 +95,35 @@ impl DataMatrix<u8> for Data<u8> {
         }
     }
 
+    fn get(&self, r: usize, c: usize) -> anyhow::Result<u8> {
+        self.params.check_bounds(r,c)?;
+        Ok(self.matrix[r][c].clone())
+    }
+
+    fn get_row(&self, r: usize) -> anyhow::Result<Vec<u8>> {
+        self.params.check_rows(r)?;
+
+        Ok(self.matrix[r].to_vec())
+    }
+
+    fn get_col(&self, c: usize) -> anyhow::Result<Vec<u8>> {
+        self.params.check_cols(c)?;
+
+        Ok(self.matrix
+            .iter()
+            .map(|row| row[c].clone())
+            .collect())
+    }
+
+    fn set(&mut self, r: usize, c: usize, elem: u8) -> anyhow::Result<()> {
+        self.params.check_bounds(r,c)?;
+        self.matrix[r][c] = elem;
+        Ok(())
+    }
+
     /// Update col `c` in shards.
     /// given `new_col` will replace the column `c` or `shards[0..k][c]`
-    fn update_col(&mut self, c: usize, new_col: &[u8]) {
+    fn update_col(&mut self, c: usize, new_col: &[u8]) -> anyhow::Result<()>{
         // sanity checks
         assert!(
             new_col.len() == self.params.k,
@@ -77,17 +131,13 @@ impl DataMatrix<u8> for Data<u8> {
             new_col.len(),
             self.params.k
         );
-        assert!(
-            c < self.params.m,
-            "col index {} out of bounds; must be < {}",
-            c,
-            self.params.m
-        );
+        self.params.check_cols(c)?;
 
         // write into each of the k data row at position c
         for i in 0..self.params.k {
             self.matrix[i][c] = new_col[i];
         }
+        Ok(())
     }
 
     /// Print all shards

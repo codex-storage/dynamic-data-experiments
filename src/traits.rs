@@ -4,7 +4,11 @@ use crate::byte_data::Params;
 pub trait DataMatrix<T>{
     type Params;
     fn new_random(params: Self::Params) -> Self;
-    fn update_col(&mut self, c: usize, new_col: &[T]);
+    fn get(&self, r: usize, c: usize) -> Result<T>;
+    fn get_row(&self, r: usize) -> Result<Vec<T>>;
+    fn get_col(&self, c: usize) -> Result<Vec<T>>;
+    fn set(&mut self, r: usize, c: usize, elem: T) -> Result<()>;
+    fn update_col(&mut self, c: usize, new_col: &[T]) -> Result<()>;
     fn pretty_print(&self);
 }
 
@@ -17,7 +21,7 @@ pub trait Encoder<T>{
     /// encode in place the input data matrix
     fn encode(data: &mut Self::DataMatrix<T>) -> Result<()>;
     /// encode a single column in place
-    fn encode_col(data: &mut Self::DataMatrix<T>, c: usize) -> Result<Vec<T>>;
+    fn encode_col(data: &mut Self::DataMatrix<T>, c: usize) -> Result<()>;
     /// reconstruct in place
     fn reconstruct(params: Params, matrix_opts: &mut Vec<Option<Vec<T>>>) -> Result<()>;
 }
