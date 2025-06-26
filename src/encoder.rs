@@ -1,8 +1,16 @@
 use std::marker::PhantomData;
 use anyhow::{anyhow, Result};
+use ark_bls12_381::Bls12_381;
+use ark_ec::pairing::Pairing;
+use ark_ff::PrimeField;
+use ark_poly::{DenseUVPolynomial, GeneralEvaluationDomain, Polynomial};
+use ark_poly::univariate::DensePolynomial;
 use reed_solomon_erasure::galois_8::ReedSolomon;
 use crate::byte_data::{Data, Params};
 use crate::traits::Encoder;
+use ark_poly::domain::EvaluationDomain;
+use crate::field_matrix::Matrix;
+// ------------- RS Encoder ------------
 
 pub struct RSEncoder<T>{
     phantom_data: PhantomData<T>
@@ -93,5 +101,94 @@ impl Encoder<u8> for RSEncoder<u8> {
         // reconstruct missing rows
         rse.reconstruct(matrix_opts)?;
         Ok(())
+    }
+}
+
+// ---------------- Bls12_381 Encoder -----------------
+
+pub type E = Bls12_381;
+pub type F = <E as Pairing>::ScalarField;
+pub type UniPoly381 = DensePolynomial<F>;
+
+pub struct BLSEncoder<T>{
+    phantom_data: PhantomData<T>
+}
+
+impl BLSEncoder<u8>{
+    pub fn new() -> Self{
+        Self{
+            phantom_data: PhantomData::default()
+        }
+    }
+}
+
+impl Encoder<u8> for BLSEncoder<u8> {
+    type Params = Params;
+    type DataMatrix<T> = Data<u8>;
+
+    fn encode(data: &mut Self::DataMatrix<u8>) -> Result<()> {
+        for i in 0..data.params.m {
+            let _col = Self::encode_col(data, i)?;
+        }
+        Ok(())
+    }
+
+    fn encode_col(data: &mut Self::DataMatrix<u8>, c: usize) -> Result<Vec<u8>> {
+        let n = data.params.n.clone();
+        let k = data.params.k.clone();
+        let mut col = data.get_col_mut(c);
+        let col_f: Vec<F> = col.iter().map(|i| <F as PrimeField>::from_le_bytes_mod_order(&i.clone().to_le_bytes())).collect();
+        let poly_poly = UniPoly381::from_coefficients_slice(&col_f);
+        let domain: GeneralEvaluationDomain<F> = EvaluationDomain::<F>::new(n).unwrap();
+
+        let mut new_col: Vec<u8> = vec![];
+        for i in k..n{
+            let eval = poly_poly.evaluate(&domain.element(i));
+            new_col.push(eval.0.0[0] as u8);
+            *col[i] = eval.0.0[0] as u8;
+        }
+
+        Ok(new_col)
+    }
+
+    fn reconstruct(_params: Params, _matrix_opts: &mut Vec<Option<Vec<u8>>>) -> Result<()> {
+        todo!()
+    }
+}
+
+// --------- BLS Encoder over FieldMatrix ----------------
+
+impl Encoder<F> for BLSEncoder<F> {
+    type Params = Params;
+    type DataMatrix<T> = Matrix<F>;
+
+    fn encode(data: &mut Matrix<F>) -> Result<()> {
+        for i in 0..data.params.m {
+            let _col = Self::encode_col(data, i)?;
+        }
+        Ok(())
+    }
+
+    fn encode_col(data: &mut Matrix<F>, c: usize) -> Result<Vec<F>> {
+        // let n = data.params.n.clone();
+        // let k = data.params.k.clone();
+        // let mut col = data.get_col_mut(c);
+        // let col_f: Vec<F> = col.iter().map(|i| <F as PrimeField>::from_le_bytes_mod_order(&i.clone().to_le_bytes())).collect();
+        // let poly_poly = UniPoly381::from_coefficients_slice(&col_f);
+        // let domain: GeneralEvaluationDomain<F> = EvaluationDomain::<F>::new(n).unwrap();
+        //
+        // let mut new_col: Vec<u8> = vec![];
+        // for i in k..n{
+        //     let eval = poly_poly.evaluate(&domain.element(i));
+        //     new_col.push(eval.0.0[0] as u8);
+        //     *col[i] = eval.0.0[0] as u8;
+        // }
+        //
+        // Ok(new_col)
+        todo!()
+    }
+
+    fn reconstruct(_params: Params, _matrix_opts: &mut Vec<Option<Vec<F>>>) -> Result<()> {
+        todo!()
     }
 }

@@ -1,32 +1,33 @@
 use ark_ff::Field;
 use ark_std::rand::Rng;
 use ark_std::UniformRand;
-use crate::byte_data::Data;
+use crate::byte_data::{Data, Params};
 
 
 /// a Field matrix with `row` number of rows and `cols` number of columns
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Matrix<F: Field + Clone> {
-    pub rows: usize,
-    pub cols: usize,
-    pub data: Vec<Vec<F>>,
+    pub params: Params,
+    pub elms: Vec<Vec<F>>,
 }
 
 impl<F: Field + Clone> Matrix<F> {
     /// Creates a new matrix from given field data.
-    pub fn new(rows: usize, cols: usize, data: Vec<Vec<F>>) -> Self {
-        assert!(data.len() == rows,      "number of rows must match");
-        for row in &data {
-            assert!(row.len() == cols,   "each row must have `cols` elements");
+    pub fn new(params: Params, elms: Vec<Vec<F>>) -> Self {
+        assert!(elms.len() == params.n,      "number of rows must match");
+        for row in &elms {
+            assert!(row.len() == params.m,   "each row must have `m` elements");
         }
-        Matrix { rows, cols, data }
+        Matrix { params, elms }
     }
 
     /// Generates a random matrix with given dimensions, uses given rng for randomness.
-    pub fn new_random<R: Rng + ?Sized>(rows: usize, cols: usize, rng: &mut R) -> Self
+    pub fn new_random<R: Rng + ?Sized>(params: Params, rng: &mut R) -> Self
         where
             F: UniformRand,
     {
+        let rows = params.n;
+        let cols = params.m;
         let mut data = Vec::with_capacity(rows);
         for _ in 0..rows {
             let mut row = Vec::with_capacity(cols);
@@ -35,7 +36,7 @@ impl<F: Field + Clone> Matrix<F> {
             }
             data.push(row);
         }
-        Matrix { rows, cols, data }
+        Matrix { params, elms: data }
     }
 
     /// Creates a new matrix from given data struct
@@ -51,24 +52,38 @@ impl<F: Field + Clone> Matrix<F> {
             }
             field_data.push(row);
         }
-        Matrix { rows, cols, data:field_data }
+        Matrix { params: data.params.clone(), elms:field_data }
     }
 
     /// get the row at 0<idx<n
     pub fn row(&self, idx: usize) -> Vec<F>{
-        assert!(idx < self.rows, "Row index out of bounds");
-        self.data[idx].to_vec()
+        assert!(idx < self.params.n, "Row index out of bounds");
+        self.elms[idx].to_vec()
     }
 
     /// get mut the row at 0<idx<n
     pub fn row_mut(&mut self, idx: usize) -> &mut Vec<F>{
-        assert!(idx < self.rows, "Row index out of bounds");
-        &mut self.data[idx]
+        assert!(idx < self.params.n, "Row index out of bounds");
+        &mut self.elms[idx]
+    }
+
+    pub fn get_col(&self, idx: usize) -> Vec<&F> {
+        self.elms
+            .iter()
+            .map(|row| &row[idx])
+            .collect()
+    }
+
+    pub fn get_col_mut(&mut self, idx: usize) -> Vec<&mut F> {
+        self.elms
+            .iter_mut()
+            .map(|row| &mut row[idx])
+            .collect()
     }
 
     /// Print matrix
     pub fn pretty_print(&self) {
-        for (i, shard) in self.data.iter().enumerate() {
+        for (i, shard) in self.elms.iter().enumerate() {
             print!("row {:>2}: ", i);
             for &b in shard {
                 print!("{:>3} ", b);

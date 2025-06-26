@@ -2,11 +2,10 @@
 mod tests {
     use crate::byte_data::{Data, Params};
     use ark_poly::{EvaluationDomain};
-    use reed_solomon_erasure::galois_8::ReedSolomon;
     use crate::kzg::{F, KZGPolyComm};
     use crate::field_matrix::Matrix;
     use ark_poly_commit::{Polynomial};
-    use crate::encoder::RSEncoder;
+    use crate::encoder::{BLSEncoder, RSEncoder};
     use crate::traits::{DataMatrix, Encoder, PolynomialCommitmentScheme};
 
     #[test]
@@ -52,6 +51,51 @@ mod tests {
             let recovered = matrix_opts[i].clone().unwrap();
             assert_eq!(recovered, &original[i][..]);
         }
+    }
+
+    #[test]
+    fn test_bls_encodeer() {
+        // test parameters
+        let k = 4;
+        let p = 4;
+        let n = k + p;
+        let m = 8;
+
+        // generate Data with random content
+        let params = Params {
+            k,
+            n,
+            m,
+        };
+        let mut data = Data::new_random(params);
+        println!("data #row ={}", data.matrix.len());
+        println!("data #col ={}", data.matrix[0].len());
+        println!("data before encoding:");
+        data.pretty_print();
+        // original data matrix
+        let original: Vec<Vec<u8>> = data.matrix[..k].to_vec();
+
+        // encode
+        BLSEncoder::encode(&mut data).expect("encode failed");
+        println!("data after encoding:");
+        data.pretty_print();
+
+        // verify data matrix unchanged
+        assert_eq!(data.matrix[..k], original[..]);
+
+        // simulate loss of one data and one parity rows
+        let mut matrix_opts: Vec<_> = data.matrix.iter().cloned().map(Some).collect();
+        matrix_opts[1] = None;
+        matrix_opts[k] = None;
+
+        // TODO: reconstruct missing rows
+        // BLSEncoder::reconstruct(data.params.clone(), &mut matrix_opts).expect("reconstruction should succeed");
+
+        // verify reconstruction for data shards
+        // for i in 0..k {
+        //     let recovered = matrix_opts[i].clone().unwrap();
+        //     assert_eq!(recovered, &original[i][..]);
+        // }
     }
 
     #[test]

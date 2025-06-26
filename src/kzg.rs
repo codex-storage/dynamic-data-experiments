@@ -66,7 +66,7 @@ impl PolynomialCommitmentScheme for KZGPolyComm {
         let (ck, _vk) = PCS::trim(&srs.pp, degree, degree, Some(&[degree]))?;
         let mut row_polynomials = vec![];
         let timer = start_timer!(|| format!("Poly evaluations and interpolation for {} rows", degree));
-        for i in 0..matrix.rows{
+        for i in 0..matrix.params.n{
             let poly_evals = Evaluations::from_vec_and_domain(matrix.row(i), srs.ploycommit_domain.clone());
             let row_poly = poly_evals.interpolate();
             let label = String::from(format!("row_poly_{}", i));

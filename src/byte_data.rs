@@ -19,6 +19,30 @@ pub struct Data<T>{
     pub matrix: Vec<Vec<T>>,
 }
 
+impl<T> Data<T>{
+    pub fn get_row(&self, idx: usize) -> &Vec<T>{
+        &self.matrix[idx]
+    }
+
+    pub fn get_row_mut(&mut self, idx: usize) -> &mut Vec<T>{
+        &mut self.matrix[idx]
+    }
+
+    pub fn get_col(&self, idx: usize) -> Vec<&T> {
+        self.matrix
+            .iter()
+            .map(|row| &row[idx])
+            .collect()
+    }
+
+    pub fn get_col_mut(&mut self, idx: usize) -> Vec<&mut T> {
+        self.matrix
+            .iter_mut()
+            .map(|row| &mut row[idx])
+            .collect()
+    }
+}
+
 impl DataMatrix<u8> for Data<u8> {
     type Params = Params;
 
