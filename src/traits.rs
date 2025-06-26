@@ -1,21 +1,25 @@
 use anyhow::Result;
+use crate::byte_data::Params;
 
 pub trait DataMatrix<T>{
     type Params;
-    fn new_random(_: Self::Params) -> Self;
+    fn new_random(params: Self::Params) -> Self;
     fn update_col(&mut self, c: usize, new_col: &[T]);
     fn pretty_print(&self);
 }
 
 /// Encoder trait
 pub trait Encoder<T>{
+    type Params;
+    /// data matrix type to encode
+    type DataMatrix<U>;
 
     /// encode in place the input data matrix
-    fn encode(&mut self) -> Result<()>;
+    fn encode(data: &mut Self::DataMatrix<T>) -> Result<()>;
     /// encode a single column in place
-    fn encode_col(&mut self, c: usize) -> Result<Vec<T>>;
+    fn encode_col(data: &mut Self::DataMatrix<T>, c: usize) -> Result<Vec<T>>;
     /// reconstruct in place
-    fn reconstruct(&mut self) -> Result<()>;
+    fn reconstruct(params: Params, matrix_opts: &mut Vec<Option<Vec<T>>>) -> Result<()>;
 }
 
 /// Polynomial Commitment scheme (e.g. KZG) trait

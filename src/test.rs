@@ -6,6 +6,7 @@ mod tests {
     use crate::kzg::{F, KZGPolyComm};
     use crate::field_matrix::Matrix;
     use ark_poly_commit::{Polynomial};
+    use crate::encoder::RSEncoder;
     use crate::traits::{DataMatrix, Encoder, PolynomialCommitmentScheme};
 
     #[test]
@@ -31,7 +32,7 @@ mod tests {
         let original: Vec<Vec<u8>> = data.matrix[..k].to_vec();
 
         // encode
-        data.encode().expect("encode failed");
+        RSEncoder::encode(&mut data).expect("encode failed");
         println!("data after encoding:");
         data.pretty_print();
 
@@ -39,13 +40,12 @@ mod tests {
         assert_eq!(data.matrix[..k], original[..]);
 
         // simulate loss of one data and one parity rows
-        let rse = ReedSolomon::new(k, p).unwrap();
         let mut matrix_opts: Vec<_> = data.matrix.iter().cloned().map(Some).collect();
         matrix_opts[1] = None;
         matrix_opts[k] = None;
 
         // reconstruct missing rows
-        rse.reconstruct(&mut matrix_opts).expect("reconstruct failed");
+        RSEncoder::reconstruct(data.params.clone(), &mut matrix_opts).expect("reconstruction should succeed");
 
         // verify reconstruction for data shards
         for i in 0..k {
@@ -68,7 +68,7 @@ mod tests {
             m,
         };
         let mut data = Data::new_random(params.clone());
-        data.encode().expect("encode failed");
+        RSEncoder::encode(&mut data).expect("encode failed");
 
         // make a random n×m matrix
         let matrix = Matrix::from_data(&data);
@@ -117,7 +117,7 @@ mod tests {
             m,
         };
         let mut data = Data::new_random(params.clone());
-        data.encode().expect("encode failed");
+        RSEncoder::encode(&mut data).expect("encode failed");
 
         // make a random n×m matrix
         let matrix = Matrix::from_data(&data);
@@ -162,7 +162,7 @@ mod tests {
         };
         // snapshot of original
         let mut data = Data::new_random(params);
-        data.encode().expect("encode failed");
+        RSEncoder::encode(&mut data).expect("encode failed");
         println!("original data:");
         data.pretty_print();
 
@@ -186,7 +186,7 @@ mod tests {
             );
         }
 
-        let _coded_row = data.encode_col(c).unwrap();
+        let _coded_row = RSEncoder::encode_col(&mut data, c).unwrap();
         println!("data after encoding update:");
         data.pretty_print();
     }
@@ -206,7 +206,7 @@ mod tests {
         };
         // snapshot of original
         let mut data = Data::new_random(params.clone());
-        data.encode().expect("encode failed");
+        RSEncoder::encode(&mut data).expect("encode failed");
 
         // Build a matrix where entry (i,j) = i * m + j
         let mut matrix = Matrix::<F>::from_data(&data);

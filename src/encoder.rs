@@ -1,27 +1,42 @@
+use std::marker::PhantomData;
 use anyhow::{anyhow, Result};
 use reed_solomon_erasure::galois_8::ReedSolomon;
-use crate::byte_data::Data;
+use crate::byte_data::{Data, Params};
 use crate::traits::Encoder;
 
+pub struct RSEncoder<T>{
+    phantom_data: PhantomData<T>
+}
 
-impl Encoder<u8> for Data<u8> {
+impl RSEncoder<u8>{
+    pub fn new() -> Self{
+        Self{
+            phantom_data: PhantomData::default()
+        }
+    }
+}
+
+impl Encoder<u8> for RSEncoder<u8> {
+    type Params = Params;
+    type DataMatrix<T> = Data<u8>;
+
     /// encode the columns of the data matrix in place
-    fn encode(&mut self) -> Result<()> {
-        let n = self.params.n;
-        assert!(self.params.k < n, "k must be less than total shards");
-        let p = n - self.params.k;
+    fn encode(data: &mut Data<u8>) -> Result<()> {
+        let n = data.params.n;
+        assert!(data.params.k < n, "k must be less than total shards");
+        let p = n - data.params.k;
 
-        // ensure all shards are same length
-        let shard_size = self.matrix[0].len();
-        for shard in &self.matrix[1..] {
-            assert_eq!(shard.len(), shard_size, "all shards must have equal length");
+        // ensure all rows are same length
+        let row_size = data.matrix[0].len();
+        for row in &data.matrix[1..] {
+            assert_eq!(row.len(), row_size, "all rows must have equal length");
         }
 
         // build the encoder
-        let rse = ReedSolomon::new(self.params.k, p)?;
+        let rse = ReedSolomon::new(data.params.k, p)?;
 
         // prepare mutable slice references for in-place encode
-        let mut shards_refs: Vec<&mut [u8]> = self.matrix.iter_mut()
+        let mut shards_refs: Vec<&mut [u8]> = data.matrix.iter_mut()
             .map(|v| v.as_mut_slice())
             .collect();
 
@@ -30,20 +45,20 @@ impl Encoder<u8> for Data<u8> {
         Ok(())
     }
 
-    fn encode_col(&mut self, c: usize) -> Result<Vec<u8>>{
+    fn encode_col(data: &mut Data<u8>, c: usize) -> Result<Vec<u8>>{
         // bounds check
-        if c >= self.params.m {
-            return Err(anyhow!("shard index {} out of bounds (< {})", c, self.params.m));
+        if c >= data.params.m {
+            return Err(anyhow!("col index {} out of bounds (< {})", c, data.params.m));
         }
 
-        let n = self.params.n;
-        let k = self.params.k;
+        let n = data.params.n;
+        let k = data.params.k;
         let p = n - k;
 
         // Build the column: data = existing byte, parity = zero
         let mut temp: Vec<Vec<u8>> = (0..n)
             .map(|i| {
-                let byte = self.matrix[i][c];
+                let byte = data.matrix[i][c];
                 if i < k {
                     vec![byte]
                 } else {
@@ -62,7 +77,7 @@ impl Encoder<u8> for Data<u8> {
         for i in 0..n {
             let b = refs[i][0];
             if i >= k {
-                self.matrix[i][c] = b;
+                data.matrix[i][c] = b;
             }
             full_col.push(b);
         }
@@ -70,7 +85,13 @@ impl Encoder<u8> for Data<u8> {
         Ok(full_col)
     }
 
-    fn reconstruct(&mut self) -> Result<()>{
-        todo!()
+    fn reconstruct(params: Params, matrix_opts: &mut Vec<Option<Vec<u8>>>) -> Result<()>{
+        let n = params.n;
+        let k = params.k;
+        let p = n - k;
+        let rse = ReedSolomon::new(k, p).unwrap();
+        // reconstruct missing rows
+        rse.reconstruct(matrix_opts)?;
+        Ok(())
     }
 }
