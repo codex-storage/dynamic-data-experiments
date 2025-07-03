@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod tests {
     use crate::byte_data::{Data, Params};
-    use ark_poly::{EvaluationDomain};
     use crate::kzg10::{E, F, get_vk, KZG10PolyComm};
     use crate::field_matrix::Matrix;
     use ark_poly_commit::kzg10::Commitment;
+    use ark_std::{test_rng, UniformRand};
     use crate::encoder::{BLSEncoder, BLSFieldEncoder, G8Encoder};
     use crate::matrix_commit::MatrixPolyComm;
-    use crate::traits::{DataMatrix, Encoder, PolyCommScheme, MatrixPolyCommScheme, CommitOutputTrait, SRSTrait};
+    use crate::traits::{DataMatrix, Encoder, PolyCommScheme, MatrixPolyCommScheme, CommitOutputTrait};
 
     #[test]
     fn test_encode_columns() {
@@ -216,22 +216,24 @@ mod tests {
         let kzg_comm = C::commit(&srs, &matrix).expect("commit_rows should succeed");
 
         // verifier Part
-        let vk = get_vk(&srs.pp).unwrap();
+        let vk = get_vk(&srs).unwrap();
         let verifier_comms: Vec<Commitment<E>> = kzg_comm.comm_output.iter().map(|c|c.get_comm().clone()).collect();
 
+        let mut rng = test_rng();
         // check all domain points
         for row in 0..n {
-            for col in 0..m {
-                let proof = C::open(&kzg_comm, &srs, row, col)
+            let poly = kzg_comm.get_poly(row);
+            for _j in 0..m {
+                let point = F::rand(&mut rng);
+                let proof = C::open(&kzg_comm, &srs, row, point.clone())
                     .expect("open should succeed");
-                let expected: F = matrix.elms[row][col].clone();
-                let point = srs.get_domain_element(col);
+                let value: F = poly.evaluate(&point);
                 assert!(
-                    C::verify(&vk, &verifier_comms[row], point, expected, &proof)
+                    C::verify(&vk, &verifier_comms[row], point.clone(), value, &proof)
                         .expect("verify should succeed"),
-                    "KZG open/verify failed for row={}, col={}",
+                    "KZG open/verify failed for row={}, point={:?}",
                     row,
-                    col
+                    point
                 );
             }
         }
