@@ -1,15 +1,15 @@
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::DenseUVPolynomial;
 use ark_poly_commit::{
     LabeledPolynomial,
 };
 use ark_std::test_rng;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::Pairing;
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{PrimeField, Zero};
-use crate::traits::{CommitOutputTrait, PolyCommScheme, SRSTrait};
+use crate::traits::{CommitOutputTrait, PolyCommScheme};
 use ark_poly_commit::kzg10::{KZG10, Proof, UniversalParams, Powers, VerifierKey, Commitment, Randomness};
 
 pub type E = Bls12_381;
@@ -17,31 +17,7 @@ pub type F = <E as Pairing>::ScalarField;
 pub type UniPoly381 = DensePolynomial<F>;
 pub type PCS = KZG10<E, UniPoly381>;
 
-pub struct KZG10SRS {
-    pub poly_domain: GeneralEvaluationDomain<F>,
-    pub pp: UniversalParams<E>
-}
-
-impl SRSTrait<F> for KZG10SRS{
-    type PP = UniversalParams<E>;
-    type Domain = GeneralEvaluationDomain<F>;
-
-    fn get_pp(&self) -> &Self::PP {
-        &self.pp
-    }
-
-    fn get_domain(&self) -> &Self::Domain {
-        &self.poly_domain
-    }
-
-    fn get_domain_element(&self, idx:usize) -> F {
-        self.poly_domain.element(idx)
-    }
-
-    fn get_domain_size(&self) -> usize{
-        self.poly_domain.size()
-    }
-}
+pub type KZG10SRS = UniversalParams<E>;
 
 pub struct KZG10PolyComm {}
 
@@ -86,7 +62,7 @@ impl CommitOutputTrait for KZG10CommitOutput {
 
 impl KZG10PolyComm{
     fn commit_single(srs: &KZG10SRS, input: F, index: usize) -> Result<Commitment<E>> {
-        let power = &srs.pp.powers_of_g[index];
+        let power = &srs.powers_of_g[index];
 
         let c = power.mul_bigint(input.into_bigint());
 
@@ -106,17 +82,13 @@ impl PolyCommScheme<F> for KZG10PolyComm {
     fn setup(degree: usize) -> Result<Self::SRS> {
         let rng = &mut test_rng();
         let pp = PCS::setup(degree,false, rng)?;
-        let poly_domain = EvaluationDomain::<F>::new(degree).ok_or(anyhow!("polycommit domain error"))?;
-        Ok(KZG10SRS {
-            poly_domain,
-            pp,
-        })
+        Ok(pp)
     }
 
     fn commit(srs: &Self::SRS, input: Vec<F>) -> Result<Self::CommitOutput> {
         let rng = &mut test_rng();
-        let degree = srs.poly_domain.size();
-        let powers = get_powers(&srs.pp, degree)?;
+        let degree = input.len();
+        let powers = get_powers(&srs, degree)?;
 
         // input are poly coeffs
         let input_poly = DensePolynomial::<F>::from_coefficients_vec(input);
@@ -165,8 +137,8 @@ impl PolyCommScheme<F> for KZG10PolyComm {
     ) -> Result<Self::Proof> {
 
         // powers from the srs
-        let m = srs.poly_domain.size();
-        let powers= get_powers(&srs.pp, m)?;
+        let m = srs.powers_of_g.len();
+        let powers= get_powers(&srs, m)?;
 
         // get row poly and rand
         let poly     = &comm.poly;

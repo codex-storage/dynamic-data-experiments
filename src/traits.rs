@@ -39,21 +39,21 @@ pub trait CommitOutputTrait {
     fn get_rand(&self) -> &Self::Rand;
 }
 
-pub trait SRSTrait<F>{
-    // public/universal params
-    type PP;
-    // domain type
-    type Domain;
-
-    fn get_pp(&self) -> &Self::PP;
-    fn get_domain(&self) -> &Self::Domain;
-    fn get_domain_element(&self, idx: usize) -> F;
-    fn get_domain_size(&self) -> usize;
-}
+// pub trait SRSTrait<F>{
+//     // public/universal params
+//     type PP;
+//     // domain type
+//     type Domain;
+//
+//     fn get_pp(&self) -> &Self::PP;
+//     fn get_domain(&self) -> &Self::Domain;
+//     fn get_domain_element(&self, idx: usize) -> F;
+//     fn get_domain_size(&self) -> usize;
+// }
 
 /// Polynomial Commitment scheme (e.g. KZG) trait
 pub trait PolyCommScheme<F>{
-    type SRS: SRSTrait<F>;
+    type SRS;
     type VK;
     type CommitOutput: CommitOutputTrait;
     type Comm;
@@ -95,7 +95,7 @@ pub trait MatrixPolyCommScheme<F, P:PolyCommScheme<F>>{
         comm: &MatrixCommitOutput<F, P>,
         srs: &P::SRS,
         row: usize,
-        col: usize,
+        point: F,
     ) -> Result<P::Proof>;
     fn verify(
         vk:   &P::VK,

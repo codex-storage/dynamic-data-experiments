@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use anyhow::Result;
 use ark_ff::Field;
 use crate::field_matrix::Matrix;
-use crate::traits::{MatrixPolyCommScheme, DataMatrix, PolyCommScheme, SRSTrait, MatrixCommitOutput};
+use crate::traits::{MatrixPolyCommScheme, DataMatrix, PolyCommScheme, MatrixCommitOutput};
 
 
 pub struct MatrixPolyComm<F, P: PolyCommScheme<F>> {
@@ -44,7 +44,6 @@ impl<F: Field + Clone, P: PolyCommScheme<F>> MatrixPolyCommScheme<F, P> for Matr
     ) -> Result<()> {
         // check input is consistent
         assert_eq!(old_col.len(), new_col.len(), "col sizes don't match");
-        assert_eq!(srs.get_domain_size(), new_col.len(), "domain size is incorrect");
 
         // loop through all new_col elements to see if there is an update at each cell
         // if there is, then update the commitment
@@ -57,9 +56,7 @@ impl<F: Field + Clone, P: PolyCommScheme<F>> MatrixPolyCommScheme<F, P> for Matr
         Ok(())
     }
 
-    fn open(comm: &MatrixCommitOutput<F, P>, srs: &P::SRS, row: usize, col: usize) -> Result<P::Proof> {
-        // the point we want to open
-        let point = srs.get_domain_element(col);
+    fn open(comm: &MatrixCommitOutput<F, P>, srs: &P::SRS, row: usize, point: F) -> Result<P::Proof> {
 
         let proof = P::open(&comm.comm_output[row], srs, point)?;
 
