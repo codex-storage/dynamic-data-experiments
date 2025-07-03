@@ -137,7 +137,7 @@ impl PolyCommScheme<F> for KZG10PolyComm {
     ) -> Result<Self::Proof> {
 
         // powers from the srs
-        let m = srs.powers_of_g.len();
+        let m = srs.powers_of_g.len() - 1;
         let powers= get_powers(&srs, m)?;
 
         // get row poly and rand
