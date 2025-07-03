@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use anyhow::Result;
 use crate::byte_data::Params;
 
@@ -26,51 +27,109 @@ pub trait Encoder<T>{
     fn reconstruct(params: Params, matrix_opts: &mut Vec<Option<Vec<T>>>) -> Result<()>;
 }
 
+pub trait CommitOutputTrait {
+    type Poly;
+    type Comm;
+    type Rand;
+
+    fn get_poly(&self) -> &Self::Poly;
+
+    fn get_comm(&self) -> &Self::Comm;
+
+    fn get_rand(&self) -> &Self::Rand;
+}
+
+pub trait SRSTrait<F>{
+    // public/universal params
+    type PP;
+    // domain type
+    type Domain;
+
+    fn get_pp(&self) -> &Self::PP;
+    fn get_domain(&self) -> &Self::Domain;
+    fn get_domain_element(&self, idx: usize) -> F;
+    fn get_domain_size(&self) -> usize;
+}
+
 /// Polynomial Commitment scheme (e.g. KZG) trait
-pub trait PolynomialCommitmentScheme{
-    type Params;
-    type Field;
-    type FieldMatrix<F>;
-    type SRS;
-    type Commitment;
+pub trait PolyCommScheme<F>{
+    type SRS: SRSTrait<F>;
+    type VK;
+    type CommitOutput: CommitOutputTrait;
+    type Comm;
     type Proof;
 
-    fn new(_params: Self::Params) -> Self;
-    fn setup(&self) -> Result<Self::SRS>;
-    fn commit(&self, _srs: &Self::SRS, _matrix:&Self::FieldMatrix<Self::Field>) -> Result<Self::Commitment>;
-    fn update_commitments(
-        srs: &Self::SRS,
-        comm: &mut Self::Commitment,
-        row_idx: usize,
-        old_row: &[Self::Field],
-        new_row: &[Self::Field],
-    ) -> Result<()>;
+    fn setup(degree: usize) -> Result<Self::SRS>;
+    fn commit(srs: &Self::SRS, input:Vec<F>) -> Result<Self::CommitOutput>;
+    fn update_commitment(srs: &Self::SRS, original_comm: &mut Self::CommitOutput, original_cell: F, new_cell:F, index: usize) -> Result<()>;
     fn open(
-        _: &Self::Commitment,
-        _: &Self::SRS,
-        _row: usize,
-        _col: usize,
+        comm: &Self::CommitOutput,
+        srs: &Self::SRS,
+        point: F
     ) -> Result<Self::Proof>;
-    fn batch_open(
-        _: &Self::Commitment,
-        _: &Self::SRS,
-        _rows: Vec<usize>,
-        _cols: Vec<usize>,
-    ) -> Result<Vec<Self::Proof>>;
     fn verify(
-        comms: &Self::Commitment,
-        srs:   &Self::SRS,
-        row:   usize,
-        col:   usize,
-        value: Self::Field,
+        vk:   &Self::VK,
+        comm: &Self::Comm,
+        point: F,
+        value: F,
         proof: &Self::Proof,
     ) -> Result<bool>;
-    fn batch_verify(
-        comms: &Self::Commitment,
-        srs:   &Self::SRS,
-        rows:   Vec<usize>,
-        cols:   Vec<usize>,
-        values: Vec<Self::Field>,
-        proof: &Vec<Self::Proof>,
+}
+
+/// Polynomial Commitment scheme for a field Matrix
+/// it commits to the rows of the Matrix
+/// and allows updating the row commitments
+pub trait MatrixPolyCommScheme<F, P:PolyCommScheme<F>>{
+    type FieldMatrix: DataMatrix<F>;
+
+    fn setup(m: usize) -> Result<P::SRS>;
+    fn commit(srs: &P::SRS, matrix:&Self::FieldMatrix) -> Result<MatrixCommitOutput<F, P>>;
+    fn update_commitments(
+        srs: &P::SRS,
+        comm: &mut MatrixCommitOutput<F, P>,
+        col_idx: usize,
+        old_col: &[F],
+        new_col: &[F],
+    ) -> Result<()>;
+    fn open(
+        comm: &MatrixCommitOutput<F, P>,
+        srs: &P::SRS,
+        row: usize,
+        col: usize,
+    ) -> Result<P::Proof>;
+    fn verify(
+        vk:   &P::VK,
+        comm: &P::Comm,
+        point: F,
+        value: F,
+        proof: &P::Proof,
     ) -> Result<bool>;
+}
+
+pub struct MatrixCommitOutput<F, P: PolyCommScheme<F>> {
+    pub comm_output: Vec<P::CommitOutput>,
+    phantom_data: PhantomData<F>
+}
+
+impl<F, P: PolyCommScheme<F>> MatrixCommitOutput<F, P> {
+    pub fn new(
+        comm_output: Vec<P::CommitOutput>
+    ) -> Self{
+        Self{
+            comm_output,
+            phantom_data:PhantomData::default(),
+        }
+    }
+
+    pub fn get_poly(&self, idx: usize) -> &<P::CommitOutput as CommitOutputTrait>::Poly{
+        &self.comm_output[idx].get_poly()
+    }
+
+    pub fn get_comm(&self, idx: usize) -> &<P::CommitOutput as CommitOutputTrait>::Comm{
+        &self.comm_output[idx].get_comm()
+    }
+
+    pub fn get_rand(&self, idx: usize) -> &<P::CommitOutput as CommitOutputTrait>::Rand{
+        &self.comm_output[idx].get_rand()
+    }
 }
