@@ -9,8 +9,12 @@ use reed_solomon_erasure::galois_8::ReedSolomon;
 use crate::byte_data::{Data, Params};
 use crate::traits::{DataMatrix, Encoder};
 use ark_poly::domain::EvaluationDomain;
+// use ark_poly_commit::Evaluations;
+use ark_poly::Evaluations;
 use crate::field_matrix::Matrix;
-// ------------- RS Encoder ------------
+
+
+// ------------- G8 Encoder ------------
 
 pub struct G8Encoder<T>{
     phantom_data: PhantomData<T>
@@ -174,11 +178,13 @@ impl Encoder<F> for BLSFieldEncoder<F>{
         let n = data.params.n.clone();
         let k = data.params.k.clone();
         let col: Vec<F> = data.get_col(c)?;
-        let poly = UniPoly381::from_coefficients_slice(&col);
-        let domain: GeneralEvaluationDomain<F> = EvaluationDomain::<F>::new(n).unwrap();
+
+        let poly_domain: GeneralEvaluationDomain<F> = EvaluationDomain::<F>::new(n).ok_or(anyhow!("polycommit domain error"))?;
+        let evals = Evaluations::from_vec_and_domain(col[0..k].to_vec(), poly_domain);
+        let poly = evals.interpolate();
 
         for i in k..n{
-                let eval = poly.evaluate(&domain.element(i));
+                let eval = poly.evaluate(&poly_domain.element(i));
                 data.set(i,c,eval)?;
         }
         Ok(())
